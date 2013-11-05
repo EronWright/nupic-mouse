@@ -2,21 +2,27 @@ from __future__ import division
 import os
 import random
 import operator
+import logging
+from util.event import Event
 from nupic.frameworks.opf.modelfactory import ModelFactory
 
 from learn.imagination import Imagination
 from mouse.model_params import MODEL_PARAMS
-
+from util.logger import init_logger 
 
 class Mouse(object):
     
     def __init__(self, config, maze):
+        self._logger = init_logger(self)
         self._config = config
         self._maze = maze
         self._training_mode = None
         
         self.id = 1
         self.location = None
+        
+        self.before_move = Event()
+        self.after_move = Event()
         
     def reset(self, initial_location, training_mode):
         """ Resets the mouse to an initial location, in preparation for a new run """
@@ -37,12 +43,14 @@ class Mouse(object):
 class DumbMouse(Mouse):
     def __init__(self, config, maze):
         Mouse.__init__(self, config, maze)
-        self._previous_location = None
         
     def reset(self, initial_location, training_mode):
         Mouse.reset(self, initial_location, training_mode)
+        self._previous_location = None
         
     def move(self):
+        self.before_move(self, self.location)
+        
         possible_moves = self._maze.possible_moves(self.location)
         
         # avoid turning around whenever possible (i.e. be curious!)
@@ -50,16 +58,19 @@ class DumbMouse(Mouse):
             possible_moves.remove(self._previous_location)
         self._previous_location = self.location
         
-        print '\tpossible moves: %s' % possible_moves
+        self._logger.debug('possible moves: %s' % possible_moves)
+        
         if len(possible_moves) >= 1:
             self.location = random.sample(possible_moves, 1)[0]
-    
+        
+        self._logger.debug('selected move: %s' % str(self.location))
+        
+        self.after_move(self, self._previous_location, self.location)
+        
 class SmartMouse(Mouse):
     def __init__(self, config, maze):
         Mouse.__init__(self, config, maze)
         
-        self._previous_location = None
-
         # this mouse uses the CLA
         self._model_path = config['serialization']['path']
         self._model_params = MODEL_PARAMS
@@ -68,17 +79,31 @@ class SmartMouse(Mouse):
        
     def reset(self, initial_location, training_mode):
         Mouse.reset(self, initial_location, training_mode)
+        self._previous_location = None
+        
+        # put the initial location into the model,  
+        # to establish an initial context for prediction
         self._model.resetSequenceStates()
+        model_input_data = self._convert_to_model_input(initial_location)
+        self._model.run(model_input_data)
         
     def move(self):
         
-        possible_moves = self._maze.possible_moves(self.location)
+        self.before_move(self, self.location)
         
+        possible_moves = self._maze.possible_moves(self.location)
+  
         # avoid turning around whenever possible (i.e. be curious!)
-        if self._previous_location in possible_moves and len(possible_moves) >= 2:
-            possible_moves.remove(self._previous_location)
+        if not self._previous_location is None:
+            assert self._previous_location in possible_moves
+            if len(possible_moves) >= 2:
+                possible_moves.remove(self._previous_location)
+            else:
+                # the mouse is turning around, use some "fresh thinking".
+                self._model.resetSequenceStates() 
+                         
         self._previous_location = self.location
-            
+                    
         if self._training_mode:
             # exploration: randomly walk the maze to learn where the cheese is.
             self.location = random.sample(possible_moves, 1)[0]
@@ -90,6 +115,8 @@ class SmartMouse(Mouse):
         # update the model with the action we've taken
         model_input_data = self._convert_to_model_input(self.location)
         self._model.run(model_input_data)
+        
+        self.after_move(self, self._previous_location, self.location)
         
     def _init_model(self):
         
@@ -114,7 +141,7 @@ class SmartMouse(Mouse):
         
         # use the imagination module to make predictions based on the 
         # a range of possible moves
-        print '\t[alg] from location %s, possible moves are %s' % (self.location, possible_moves)
+        self._logger.debug('from location %s, possible moves are %s' % (self.location, possible_moves))
         
         def predict_closure(input):    
             def predict(model_fork):
@@ -125,6 +152,7 @@ class SmartMouse(Mouse):
         
         if len(possible_moves) == 1:
             # no imagination is necessary in this case because there is only one choice
+            self._logger.debug('trivial decision, move forward')
             return possible_moves[0]
             
         # apply the function for each action
@@ -142,8 +170,9 @@ class SmartMouse(Mouse):
         # finally, select the best prediction
         sorted_predictions = sorted(benefits, key=operator.itemgetter(1))
         sorted_predictions.reverse()
+        
         for l,p in sorted_predictions:
-            print '\t[alg] evalation of move %s yields benefit %d' % (l,p)
+            self._logger.debug('evalation of move %s yields benefit %d' % (l,p))
         
         return sorted_predictions[0][0]
         

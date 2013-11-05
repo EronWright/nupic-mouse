@@ -1,8 +1,4 @@
 
-runner_config = {
-    'max_ticks': 5,
-}
-
 mouse_config = {
     'min_probability': 0.20,
     'serialization': {

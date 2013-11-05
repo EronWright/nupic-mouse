@@ -1,46 +1,55 @@
+from __future__ import division
 import sys
+import random
 
-class Runner(object):
-    
-    def __init__(self, config, maze, mouse_list):
-        self._config = config
+from util.event import Event
+
+class Trial(object):
+    """
+    Represents a single trial of a given set of mice in a given maze
+    """
+    def __init__(self, maze, mice):
         self._maze = maze
-        self._mouse_list = mouse_list
-        self._ticks = 0
+        self.mice = mice
         
-    def reset(self, train = False):
-        self._ticks = 0
-        self._total_rewards = dict()
-        for mouse in self._mouse_list:
-            mouse.reset(self._maze.initial_location, train)
-            self._total_rewards[mouse] = 0
+        self.current_tick = None
+        self.num_ticks = None
+        
+        self.before_run = Event()
+        self.after_run = Event()
+        self.before_tick = Event()
+        self.after_tick = Event()
+        
+    def reset(self, train = False, num_ticks = 0):
+        self.num_ticks = num_ticks
+        self.current_tick = 0
+        self.train = train
+        self.total_rewards = dict()
+        
+        self._maze.reset()
+        for mouse in self.mice:
+            initial_location = random.sample(self._maze.all_locations(),1)[0]
+            #initial_location = self._maze.initial_location
+            mouse.reset(initial_location, train)
+            self.total_rewards[mouse] = self._maze.cheese[initial_location]
             
     def run(self):
+        self.before_run(self)
         
-        print 'Start Run'
-        while self._ticks < self._config['max_ticks']:
-            try:
-                self._tick()
-            except Exception as e:
-                print e
-                sys.exit()
+        while self.current_tick < self.num_ticks:
+            self._tick()
 
-        print 'End Run'
-    
-        for mouse in self._mouse_list:
-            print 'Mouse %d has total reward %d' % \
-                (mouse.id, self._total_rewards[mouse])
-        
-        return self._total_rewards
+        self.after_run(self)
+        return self.total_rewards
         
     def _tick(self):
         
-        self._ticks += 1
+        self.current_tick += 1
         
-        print '[tick %d]' % self._ticks
+        self.before_tick(self, self.current_tick)
         
         # tick each mouse
-        for mouse in self._mouse_list:
+        for mouse in self.mice:
             
             # move
             old_location = mouse.location
@@ -49,10 +58,7 @@ class Runner(object):
             
             # reward
             reward = self._maze.cheese[new_location]
-            self._total_rewards[mouse] += reward
+            self.total_rewards[mouse] += reward
             
-            print '\tmouse %s moved from %s to %s, reward is %d' \
-                % (mouse.id, old_location, new_location, reward)
-            
-
+        self.after_tick(self, self.current_tick)
                 
