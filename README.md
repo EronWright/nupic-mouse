@@ -7,7 +7,7 @@ The code was written during the [NuPIC Fall 2013 Hackathon](http://www.meetup.co
 
 A demonstration of the project may be seen in the [demo video](http://www.youtube.com/watch?feature=player_detailpage&v=X4XjYXFRIAQ#t=1980).
 
-The purpose of the project was to demonstrate how a hypothetical situation may be evaluated with a model.  I characterized this as giving the CLA an imagination.   A slow, prototype form of the idea is coded in learn/imagination.py.   Look at mouse/mice.py (_choose_best_move) for example usage.  The gist is to provide a list of functions, each of which are applied to a copy of the original model to produce a prediction.  The set of predictions (one per function) are returned.
+The purpose of the project was to demonstrate how a hypothetical situation may be evaluated with a model.  I characterized this as giving the CLA an imagination.   A slow, prototype form of the idea is coded in learn/imagination.py.   Look at mouse/mice.py (choose-best-move) for example usage.  The gist is to provide a list of functions, each of which are applied to a copy of the original model to produce a prediction.  The set of predictions (one per function) are returned.
 
 # Usage
 Examine the main.py file to see the command-line arguments.  Run either the 'dumb' or the 'smart' mouse with a few training and test iterations, as specified on the command-line.
