@@ -72,8 +72,7 @@ def main():
     mouse.after_move.append(_on_after_mouse_move)
     
     print '*************** MAZE *****************'
-    print 'Maze layout:\n', maze.layout
-    print 'Maze cheese:\n', maze.cheese
+    maze.print_maze()
     
     if args.train >= 1:
         print '*************** TRAIN ****************'

@@ -29,7 +29,6 @@ class Trial(object):
         self._maze.reset()
         for mouse in self.mice:
             initial_location = random.sample(self._maze.all_locations(),1)[0]
-            #initial_location = self._maze.initial_location
             mouse.reset(initial_location, train)
             self.total_rewards[mouse] = self._maze.cheese[initial_location]
             
